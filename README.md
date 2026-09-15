@@ -12,17 +12,17 @@ Predict survival on the Titanic using passenger demographics and ticket informat
 
 - **Source**: Seaborn's built-in Titanic dataset (891 passengers)
 - **Target**: `survived` (binary: 0=died, 1=survived)
-- **Features**: 17 features after engineering (demographics, ticket info, engineered features)
+- **Features**: 13 features after cleaning (demographics, ticket info, engineered features) — leaky columns removed (`alive`, `class`, `who`, `embark_town`, `alone`)
 - **Class Balance**: 61.6% died, 38.4% survived
 
 ## Key Results
 
 | Model | ROC-AUC | PR-AUC | F1 | Accuracy |
 |-------|---------|--------|-----|----------|
-| Logistic Regression | ~0.85 | ~0.80 | ~0.77 | ~0.78 |
-| Random Forest | ~0.85 | ~0.83 | ~0.78 | ~0.79 |
-| XGBoost | ~0.82 | ~0.24 | ~0.28 | ~0.80 |
-| LightGBM | ~0.83 | ~0.24 | ~0.28 | ~0.79 |
+| Logistic Regression | 0.8536 | 0.7942 | 0.7324 | 0.7877 |
+| Random Forest | 0.8435 | 0.8242 | 0.7383 | 0.7821 |
+| XGBoost | 0.8206 | 0.7893 | 0.7234 | 0.7821 |
+| LightGBM | 0.8030 | 0.7649 | 0.7111 | 0.7821 |
 
 **Best Model**: Random Forest (balanced performance, interpretable feature importance)
 
@@ -49,37 +49,45 @@ phase1_titanic/
 ### Local Development
 
 ```bash
-# Create conda environment
-conda create -n titanic python=3.10
-conda activate titanic
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
 # Train models
 cd src && python train.py
 
-# Run API locally
+# Run API locally (port 8001)
 python api/main.py
-# Test: curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d '{"pclass": 1, "sex": "female", "age": 25, ...}'
+# Test: curl -X POST http://localhost:8001/predict -H "Content-Type: application/json" -d '{"pclass": 1, "sex": "female", "age": 25, "sibsp": 0, "parch": 0, "fare": 100, "embarked": "S", "adult_male": false, "deck": "C", "family_size": 1, "fare_per_person": 100, "is_alone": 1, "age_bin": "Young Adult"}'
 ```
 
 ### Docker
 
 ```bash
 docker build -t titanic-api .
-docker run -p 8000:8000 titanic-api
+docker run -p 8001:8000 titanic-api
 ```
 
 ### MLflow Tracking
 
 ```bash
-mlflow ui --backend-store-uri file:mlruns
+MLFLOW_ALLOW_FILE_STORE=true mlflow ui --backend-store-uri file:mlruns
 # Open http://localhost:5000
 ```
+
+All experiments logged to `mlruns/`:
+- Logistic Regression baseline
+- Random Forest (best)
+- XGBoost
+- LightGBM
+
+Run `MLFLOW_ALLOW_FILE_STORE=true mlflow ui --backend-store-uri file:mlruns` to view experiments.
 
 ## API Usage
 
 ```bash
-curl -X POST http://localhost:8000/predict \
+curl -X POST http://localhost:8001/predict \
   -H "Content-Type: application/json" \
   -d '{
     "pclass": 1,
@@ -89,16 +97,11 @@ curl -X POST http://localhost:8000/predict \
     "parch": 0,
     "fare": 100,
     "embarked": "S",
-    "class": "First",
-    "who": "woman",
     "adult_male": false,
     "deck": "C",
-    "embark_town": "Southampton",
-    "alive": "yes",
-    "alone": true,
     "family_size": 1,
-    "is_alone": 1,
     "fare_per_person": 100,
+    "is_alone": 1,
     "age_bin": "Young Adult"
   }'
 ```
@@ -107,8 +110,8 @@ Response:
 ```json
 {
   "survived": 1,
-  "survival_probability": 0.94,
-  "death_probability": 0.06,
+  "survival_probability": 0.9598,
+  "death_probability": 0.0402,
   "risk_category": "high"
 }
 ```
@@ -121,12 +124,12 @@ All experiments logged to `mlruns/`:
 - XGBoost
 - LightGBM
 
-Run `mlflow ui --backend-store-uri file:mlruns` to view experiments.
+Run `MLFLOW_ALLOW_FILE_STORE=true mlflow ui --backend-store-uri file:mlruns` to view experiments.
 
 ## Tests
 
 ```bash
-pytest tests/ -v
+MLFLOW_ALLOW_FILE_STORE=true pytest tests/ -v
 ```
 
 Tests cover:
@@ -142,12 +145,16 @@ Tests cover:
 2. **Imbalance handling** — `class_weight='balanced'` works better than SMOTE for tree models
 3. **Threshold tuning** — Default 0.5 is rarely optimal; use Youden's J or cost-based thresholds
 4. **SHAP for explainability** — Random Forest feature importance aligns with domain knowledge (sex, fare, class)
+5. **Data leakage prevention** — Removed leaky columns (`alive`, `class`, `who`, `embark_town`, `alone`) before modeling
 
-## Next Steps
+## Docker Hub
 
-This mini-project serves as the template for 5 healthcare projects:
-1. Hospital Readmission Risk Predictor
-2. Sepsis Early-Warning System
-3. Chest X-Ray Pneumonia Detector
-4. Clinical Document RAG Assistant
-5. Patient No-Show & Hospital Ops Optimizer
+```bash
+docker build -t bakr1m/titanic-survival-prediction .
+docker push bakr1m/titanic-survival-prediction
+```
+
+Run from Docker Hub:
+```bash
+docker run -p 8001:8000 bakr1m/titanic-survival-prediction
+```

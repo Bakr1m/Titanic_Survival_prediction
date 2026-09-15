@@ -78,7 +78,7 @@ def build_preprocessor(X_train):
         ]
     )
     
-    return preprocessor
+    return preprocessor, numeric_features, categorical_features
 
 
 def prepare_data():
@@ -96,7 +96,9 @@ def prepare_data():
 
 def get_features_target(df):
     """Split dataframe into features and target"""
-    feature_cols = [c for c in df.columns if c != 'survived']
-    X = df.drop(columns=['survived'])
+    # Drop leaky/redundant columns
+    leaky_cols = ['survived', 'alive', 'class', 'who', 'embark_town', 'alone']
+    feature_cols = [c for c in df.columns if c not in leaky_cols]
+    X = df[feature_cols]
     y = df['survived']
     return X, y

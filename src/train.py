@@ -1,13 +1,13 @@
 """
 Training script for Titanic project
 """
+import os
+os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+
 import pandas as pd
 import numpy as np
 import joblib
 import mlflow
-import mlflow.sklearn
-import mlflow.xgboost
-import mlflow.lightgbm
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -24,8 +24,9 @@ def train_models():
     # Load and prepare data
     df = pd.read_csv('data/titanic_clean.csv')
     
-    feature_cols = [c for c in df.columns if c != 'survived']
-    X = df.drop(columns=['survived'])
+    # Drop leaky/redundant columns
+    leaky_cols = ['survived', 'alive', 'class', 'who', 'embark_town', 'alone']
+    X = df.drop(columns=leaky_cols)
     y = df['survived']
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
@@ -63,7 +64,6 @@ def train_models():
         mlflow.log_metric("pr_auc", pr_auc)
         mlflow.log_metric("f1", f1)
         mlflow.log_metric("accuracy", acc)
-        import mlflow.sklearn
         mlflow.sklearn.log_model(lr, "model")
         
         print(f"LR: ROC-AUC={roc_auc:.4f}, PR-AUC={pr_auc:.4f}, F1={f1:.4f}, Acc={acc:.4f}")
@@ -128,7 +128,6 @@ def train_models():
         mlflow.log_metric("pr_auc", pr_auc)
         mlflow.log_metric("f1", f1)
         mlflow.log_metric("accuracy", acc)
-        import mlflow.xgboost
         mlflow.xgboost.log_model(xgb_clf, "model")
         
         print(f"XGBoost: ROC-AUC={roc_auc:.4f}, PR-AUC={pr_auc:.4f}, F1={f1:.4f}, Acc={acc:.4f}")
@@ -167,8 +166,17 @@ def train_models():
     from sklearn.pipeline import Pipeline
     import joblib
     
+    # Refit preprocessor on full dataset (without leaky columns) for final pipeline
+    leaky_cols = ['survived', 'alive', 'class', 'who', 'embark_town', 'alone']
+    full_df = pd.read_csv('data/titanic_clean.csv')
+    X_full = full_df.drop(columns=leaky_cols)
+    y_full = full_df['survived']
+    
+    preprocessor_full, _, _ = build_preprocessor(X_full)
+    preprocessor_full.fit(X_full)
+    
     best_pipeline = Pipeline([
-        ('preprocessor', build_preprocessor(pd.read_csv('data/titanic_clean.csv').drop(columns=['survived']))[0].fit(pd.read_csv('data/titanic_clean.csv').drop(columns=['survived']))),
+        ('preprocessor', preprocessor_full),
         ('classifier', rf)
     ])
     
@@ -177,6 +185,4 @@ def train_models():
 
 
 if __name__ == "__main__":
-    import mlflow
-    mlflow.set_tracking_uri("file:mlruns")
     train_models()

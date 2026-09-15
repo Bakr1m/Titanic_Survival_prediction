@@ -16,7 +16,7 @@ pipeline = joblib.load("models/titanic_pipeline.joblib")
 # Feature columns (must match training)
 FEATURE_COLS = [
     'pclass', 'sex', 'age', 'sibsp', 'parch', 'fare', 'embarked',
-    'class', 'who', 'adult_male', 'deck', 'embark_town', 'alive', 'alone',
+    'pclass_str', 'who', 'adult_male', 'deck', 'embark_town', 'alive', 'alone',
     'family_size', 'is_alone', 'fare_per_person', 'age_bin'
 ]
 
@@ -30,7 +30,7 @@ class PassengerInput(BaseModel):
     parch: int = Field(..., ge=0, description="Number of parents/children aboard")
     fare: float = Field(..., ge=0, description="Passenger fare")
     embarked: str = Field(..., description="Port of embarkation: S, C, or Q")
-    class: str = Field(..., description="Class: First, Second, Third")
+    pclass_str: str = Field(..., description="Class: First, Second, Third", alias="class")
     who: str = Field(..., description="Who: man, woman, child")
     adult_male: bool = Field(..., description="Is adult male")
     deck: str = Field(..., description="Deck: A, B, C, D, E, F, G, Unknown")
@@ -72,8 +72,13 @@ def health():
 def predict(passenger: PassengerInput):
     try:
         # Convert to DataFrame with correct column order
-        input_dict = passenger.model_dump()
+        input_dict = passenger.model_dump(by_alias=True)
         input_df = pd.DataFrame([input_dict])
+        input_df.columns = [
+            'pclass', 'sex', 'age', 'sibsp', 'parch', 'fare', 'embarked',
+            'class', 'who', 'adult_male', 'deck', 'embark_town', 'alive', 'alone',
+            'family_size', 'is_alone', 'fare_per_person', 'age_bin'
+        ]
         
         # Predict
         proba = pipeline.predict_proba(input_df)[0, 1]

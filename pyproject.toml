@@ -1,0 +1,17 @@
+[project]
+name = "titanic-survival-prediction"
+version = "1.0.0"
+description = "Kaggle Titanic survival prediction: EDA + feature engineering + sklearn pipelines and PyTorch baseline, pytest, FastAPI, Docker"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]

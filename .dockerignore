@@ -1,0 +1,14 @@
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+mlruns/
+data/
+notebooks/
+tests/
+models/
+.git/
+.vscode/
+.idea/
+*.log
+*.joblib

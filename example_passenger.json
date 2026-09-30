@@ -1,0 +1,15 @@
+{
+  "pclass": 1,
+  "sex": "female",
+  "age": 25,
+  "sibsp": 0,
+  "parch": 0,
+  "fare": 100.0,
+  "embarked": "S",
+  "adult_male": false,
+  "deck": "C",
+  "family_size": 1,
+  "is_alone": 1,
+  "fare_per_person": 100.0,
+  "age_bin": "Young Adult"
+}

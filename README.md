@@ -1,21 +1,39 @@
-# Phase 1: Titanic Survival Prediction — Mini Project
+# Titanic Survival Prediction
 
-**Days 1–10 | Crash Course Foundations**
-
-This is the Phase 1 capstone mini-project from the 60-Day ML Engineer Roadmap. It demonstrates the complete ML lifecycle: data profiling → cleaning → EDA → modeling → evaluation → API → Docker deployment.
+**Foundations capstone | ML Lifecycle: data → model → evaluation → API → Docker**
 
 ## Business Context
 
-Predict survival on the Titanic using passenger demographics and ticket information. While not a healthcare problem, this serves as the "dress rehearsal" for the 5 real healthcare projects that follow.
+Predict survival on the Titanic using passenger demographics and ticket
+information. A foundations "dress rehearsal" for the healthcare portfolio:
+the same engineering bar (pipelines, hermetic tests, CI, release-pinned
+artifacts, Docker) on a small, fully understood dataset.
 
 ## Dataset
 
-- **Source**: Seaborn's built-in Titanic dataset (891 passengers)
-- **Target**: `survived` (binary: 0=died, 1=survived)
-- **Features**: 13 features after cleaning (demographics, ticket info, engineered features) — leaky columns removed (`alive`, `class`, `who`, `embark_town`, `alone`)
-- **Class Balance**: 61.6% died, 38.4% survived
+- **Source**: seaborn built-in `titanic` (Kaggle Titanic, 891 passengers);
+  reproduced locally via `scripts/download_data.sh` (data/ is gitignored)
+- **Target**: `survived` (binary; 61.6% died, 38.4% survived)
+- **Features**: 13 leak-free columns (demographics, ticket info, engineered
+  `family_size`, `is_alone`, `fare_per_person`, `age_bin`)
+- **Excluded as leaky**: `alive`, `class`, `who`, `embark_town`, `alone`
+  (label-derived or redundant) — the API rejects them with 422
 
-## Key Results
+## Approach
+
+1. **EDA + cleaning** (`notebooks/02–03`): age median-by-sex×class, deck →
+   `Unknown`, 2 missing embarked.
+2. **Feature engineering** (`src/preprocessing.py`): family size, alone flag,
+   fare-per-person, age bins.
+3. **Pipelines** (`src/train.py`): ColumnTransformer fit on train only
+   (median/most-frequent → scale/one-hot); stratified 80/20 split.
+4. **Baselines** (`notebooks/05–09`): LR, RF, XGBoost, LightGBM + PyTorch;
+   imbalance via `class_weight='balanced'`; MLflow tracking.
+5. **Serving** (`src/serve.py`): FastAPI `/predict`, lazy model load,
+   feature order derived from the fitted transformer.
+6. **Container**: release-pinned artifact, SHA256-verified, parity-checked.
+
+## Results
 
 | Model | ROC-AUC | PR-AUC | F1 | Accuracy |
 |-------|---------|--------|-----|----------|
@@ -24,137 +42,51 @@ Predict survival on the Titanic using passenger demographics and ticket informat
 | XGBoost | 0.8206 | 0.7893 | 0.7234 | 0.7821 |
 | LightGBM | 0.8030 | 0.7649 | 0.7111 | 0.7821 |
 
-**Best Model**: Random Forest (balanced performance, interpretable feature importance)
+**Shipped model**: Random Forest (balanced performance, interpretable
+importance: sex, fare, class). Example: 1st-class young woman → survival
+probability 0.9598.
 
-## Project Structure
+## Limitations
 
-```
-phase1_titanic/
-├── data/              # titanic_clean.csv
-├── notebooks/         # 01-10 numbered notebooks
-├── src/
-│   ├── preprocessing.py
-│   ├── train.py
-│   └── serve.py
-├── models/            # titanic_pipeline.joblib
-├── api/               # FastAPI app
-├── tests/             # pytest tests
-├── Dockerfile
-├── requirements.txt
-└── README.md
-```
+1. **Toy 1912 data**: no generalization claim to any modern population.
+2. **`deck` 77% missing** (imputed `Unknown`); `age` ~20% missing.
+3. **Default 0.5 threshold**: no calibration or cost tuning.
+4. **Single 80/20 split**: no cross-validation; small-sample variance.
+5. **Historical bias**: importance reflects 1912 evacuation patterns
+   ("women and children first") — descriptive, not normative.
 
-## Quick Start
+## Ethical Considerations
 
-### Local Development
+Demo only. The model must never inform any real decision; its strongest
+signals (sex, class, fare) encode historical inequity, and presenting them
+as predictors without that context would be misleading.
+
+## Run Instructions
 
 ```bash
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Train models
-cd src && python train.py
-
-# Run API locally (port 8001)
-python api/main.py
-# Test: curl -X POST http://localhost:8001/predict -H "Content-Type: application/json" -d '{"pclass": 1, "sex": "female", "age": 25, "sibsp": 0, "parch": 0, "fare": 100, "embarked": "S", "adult_male": false, "deck": "C", "family_size": 1, "fare_per_person": 100, "is_alone": 1, "age_bin": "Young Adult"}'
+make install-dev   # serving deps + pytest/ruff/httpx
+make test lint     # 11 tests, ruff clean
+make install-train # + xgboost/lightgbm/mlflow/shap/seaborn
+bash scripts/download_data.sh  # rebuild data/titanic_clean.csv
+make train         # retrain; saves models/titanic_pipeline.joblib
+make serve         # API on :8000
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" -d @example_passenger.json
 ```
 
-### Docker
+Docker (prebuilt, release-pinned artifact inside):
 
 ```bash
-docker build -t titanic-api .
-docker run -p 8001:8000 titanic-api
+docker pull bakr1m/titanic-api:latest
+docker run -p 8000:8000 bakr1m/titanic-api:latest
 ```
-
-### MLflow Tracking
-
-```bash
-MLFLOW_ALLOW_FILE_STORE=true mlflow ui --backend-store-uri file:mlruns
-# Open http://localhost:5000
-```
-
-All experiments logged to `mlruns/`:
-- Logistic Regression baseline
-- Random Forest (best)
-- XGBoost
-- LightGBM
-
-Run `MLFLOW_ALLOW_FILE_STORE=true mlflow ui --backend-store-uri file:mlruns` to view experiments.
-
-## API Usage
-
-```bash
-curl -X POST http://localhost:8001/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pclass": 1,
-    "sex": "female",
-    "age": 25,
-    "sibsp": 0,
-    "parch": 0,
-    "fare": 100,
-    "embarked": "S",
-    "adult_male": false,
-    "deck": "C",
-    "family_size": 1,
-    "fare_per_person": 100,
-    "is_alone": 1,
-    "age_bin": "Young Adult"
-  }'
-```
-
-Response:
-```json
-{
-  "survived": 1,
-  "survival_probability": 0.9598,
-  "death_probability": 0.0402,
-  "risk_category": "high"
-}
-```
-
-## MLflow Tracking
-
-All experiments logged to `mlruns/`:
-- Logistic Regression baseline
-- Random Forest (best)
-- XGBoost
-- LightGBM
-
-Run `MLFLOW_ALLOW_FILE_STORE=true mlflow ui --backend-store-uri file:mlruns` to view experiments.
-
-## Tests
-
-```bash
-MLFLOW_ALLOW_FILE_STORE=true pytest tests/ -v
-```
-
-Tests cover:
-- No missing values after preprocessing
-- Known input → known output shape
-- Feature engineering invariants
-- Pipeline serialization round-trip
-- Class balance preservation in stratified split
 
 ## Key Learnings
 
-1. **Pipelines prevent leakage** — ColumnTransformer fit only on training folds
-2. **Imbalance handling** — `class_weight='balanced'` works better than SMOTE for tree models
-3. **Threshold tuning** — Default 0.5 is rarely optimal; use Youden's J or cost-based thresholds
-4. **SHAP for explainability** — Random Forest feature importance aligns with domain knowledge (sex, fare, class)
-5. **Data leakage prevention** — Removed leaky columns (`alive`, `class`, `who`, `embark_town`, `alone`) before modeling
-
-## Docker Hub
-
-```bash
-docker build -t bakr1m/titanic-survival-prediction .
-docker push bakr1m/titanic-survival-prediction
-```
-
-Run from Docker Hub:
-```bash
-docker run -p 8001:8000 bakr1m/titanic-survival-prediction
-```
+1. **Pipelines prevent leakage** — ColumnTransformer fit only on training folds.
+2. **`class_weight='balanced'`** beats SMOTE for tree models on this data.
+3. **Leakage is a contract problem** — the first serving schema required the
+   label-derived columns the model excluded; now rejected with 422.
+4. **Hermetic tests** — synthetic same-schema fallback keeps CI green with
+   no `data/` present.
+5. **Default 0.5 is rarely optimal** — Youden's J or cost-based thresholds.

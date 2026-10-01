@@ -15,7 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   stand-in pipeline fixture); ruff lint; GitHub Actions CI with test gate.
 - Dockerized serving image (`bakr1m/titanic-api`) built from the
   release-pinned artifact (SHA256-verified), parity-checked, smoke-tested.
-- Professional repo hygiene: LICENSE, CONTRIBUTING, CHANGELOG, CI workflow,
+- Professional repo hygiene: CONTRIBUTING, CHANGELOG, CI workflow,
   Makefile, model card, example passenger payload.
 
 ### Fixed

@@ -1,13 +1,13 @@
 # Titanic Survival Prediction
 
-**Foundations capstone | ML Lifecycle: data → model → evaluation → API → Docker**
+**ML Lifecycle: data → model → evaluation → API → Docker**
 
 ## Business Context
 
 Predict survival on the Titanic using passenger demographics and ticket
-information. A foundations "dress rehearsal" for the healthcare portfolio:
-the same engineering bar (pipelines, hermetic tests, CI, release-pinned
-artifacts, Docker) on a small, fully understood dataset.
+information. Built to the same engineering bar as the healthcare and
+vision systems in this portfolio (pipelines, hermetic tests, CI,
+release-pinned artifacts, Docker) on a small, fully understood dataset.
 
 ## Dataset
 

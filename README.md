@@ -78,8 +78,35 @@ Docker (prebuilt, release-pinned artifact inside):
 
 ```bash
 docker pull bakr1m/titanic-api:latest
-docker run -p 8000:8000 bakr1m/titanic-api:latest
+docker run -d --name titanic -p 8006:8000 bakr1m/titanic-api:latest
+curl http://localhost:8006/health
+# {"status":"healthy"}
+curl -X POST http://localhost:8006/predict \
+  -H "Content-Type: application/json" -d @example_passenger.json
+# -> {"survived":1,"survival_probability":0.9598,...,"risk_category":"high"}
+docker stop titanic && docker rm titanic
 ```
+
+(`example_passenger.json` is in this repo — the exact payload CI
+smoke-tests the shipped image with. Verified live against `:latest`.)
+
+## Problems Encountered (Build & Deploy)
+
+1. **The API demanded the leakage it claimed to prevent.** The README said
+   leaky columns were removed — but the serving schema *required* them
+   (`alive`, `class`, `who`, `embark_town`, `alone`), because nobody had
+   diffed the schema against the fitted transformer. Fixed by deriving the
+   contract from the pipeline and rejecting leaky fields with 422.
+2. **Model loaded at import, path relative to CWD.** `joblib.load` at
+   module scope with `"models/..."` broke under any other working
+   directory. Now lazy `get_pipeline()` behind a repo-root-resolved path
+   (503 if the artifact is missing).
+3. **Dockerfile copied a gitignored directory.** `COPY models/` shipped an
+   empty dir on clean checkouts since the artifact was gitignored — the
+   image couldn't serve. Now fetched from the pinned release with SHA
+   verification, like the rest of the fleet.
+4. **Tests required the CSV.** Fixed with the synthetic same-schema
+   fallback (hermetic both ways — verified with and without `data/`).
 
 ## Key Learnings
 
